@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://956231studiocom.github.io/email-deliverability-diagnose/sitemap.xml
