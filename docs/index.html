@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email Deliverability Diagnose — score any .eml offline</title>
+<meta name="description" content="Free open-source tool that scores a raw .eml against the signals that decide inbox vs spam: SPF, DKIM, DMARC, List-Unsubscribe, spam triggers, MIME hygiene. Runs offline, sends nothing.">
+<link rel="canonical" href="https://956231studio.com/packs/deliverability-rescue-kit/">
+<style>
+:root{--ink:#16161a;--sub:#5d5d68;--line:#e6e6ec;--bg:#fbfbfc;--accent:#2d5bff;--ok:#12855a;--warn:#b4441a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:0 24px 72px}
+header{padding:56px 0 28px}
+h1{font-size:30px;letter-spacing:-.02em;margin:0 0 12px;line-height:1.25}
+.tag{color:var(--sub);font-size:17px;margin:0 0 24px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.b{font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:#eef1ff;color:var(--accent)}
+.b.g{background:#e7f7ef;color:var(--ok)}
+h2{font-size:19px;margin:38px 0 12px}
+pre{background:#151519;color:#e8e8ee;padding:16px 18px;border-radius:10px;overflow:auto;font-size:13px;line-height:1.6;margin:12px 0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+p code,li code{background:#f0f0f4;padding:1px 5px;border-radius:4px;font-size:13.5px}
+table{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line)}
+th{background:#f5f5f8;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#52525e}
+tr:last-child td{border-bottom:0}
+.cta{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:18px 20px;margin:26px 0}
+.cta a{color:var(--accent);font-weight:600}
+a{color:var(--accent)}
+.note{background:#fff8f2;border:1px solid #f2dccb;border-radius:10px;padding:14px 16px;font-size:14.5px;color:#7a3d16}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--sub);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>Score any <code>.eml</code> against the rules that decide inbox vs. spam</h1>
+<p class="tag">Offline, read-only, nothing is ever sent. Standard library only — no <code>pip install</code>.</p>
+<div class="badges"><span class="b g">no network</span><span class="b">python 3.8+</span><span class="b">MIT</span><span class="b">selftest 8/8</span></div>
+</header>
+
+<h2>Why</h2>
+<p>When a campaign lands in spam, the answer is already sitting in your inbox — the <code>Authentication-Results</code> header, the missing <code>List-Unsubscribe</code>, the HTML-only body, the subject with three exclamation marks. Nobody reads it, because the header is forty lines of noise. This tool reads it for you and returns a ranked fix list.</p>
+
+<h2>Run it</h2>
+<pre><code>git clone https://github.com/956231studiocom/email-deliverability-diagnose
+python3 scripts/diagnose.py --eml examples/bad-campaign.eml --format md</code></pre>
+
+<p>Real output from the bundled sample — a message built the way most damaged campaigns are built:</p>
+<pre><code>- Score: **53/100** (damaged)
+- From: growth@mailer.example-co.com | Return-Path: -
+
+**Findings**
+- auth_results_missing   no Authentication-Results header
+- no_unsubscribe         no List-Unsubscribe header
+- no_plain_text          HTML-only message, no text/plain alternative
+- subject_punct          subject has repeated ! or $$$
+- subject_spamword       subject contains: act now, guarantee
+- no_message_id          no Message-ID header
+
+**Fix in this order**
+1. Pull the raw header from a real inbox (Gmail: Show original)
+2. Add List-Unsubscribe with mailto: and https: one-click
+3. Add a text/plain part
+4. Use at most one exclamation mark
+5. Rewrite the subject without trigger words
+6. Let your ESP set Message-ID</code></pre>
+
+<h2>What it checks</h2>
+<table>
+<tr><th>Group</th><th>Signals</th></tr>
+<tr><td>Authentication</td><td><code>Authentication-Results</code>, SPF / DKIM / DMARC verdicts, Return-Path alignment</td></tr>
+<tr><td>Compliance</td><td><code>List-Unsubscribe</code> (mailto + one-click https), <code>List-Unsubscribe-Post</code></td></tr>
+<tr><td>Content risk</td><td>Subject punctuation and trigger words, text-to-image ratio, HTML-only bodies, link count</td></tr>
+<tr><td>Hygiene</td><td><code>Message-ID</code>, <code>Date</code>, <code>MIME-Version</code>, malformed charset quoting</td></tr>
+<tr><td>Structure</td><td>MIME tree integrity, missing <code>text/plain</code> alternative, oversized single image</td></tr>
+<tr><td>Headers</td><td><code>From</code> / <code>Reply-To</code> alignment, display-name spoofing patterns</td></tr>
+</table>
+
+<div class="note"><strong>What it does not do:</strong> no DNS lookups, no blocklist queries, no SMTP, no ESP login. There is no send code path in the file — which is why you can run it on a production mailbox export on a locked-down machine.</div>
+
+<h2>Getting the raw .eml</h2>
+<ul>
+<li><strong>Gmail</strong> — open message → ⋮ → Show original → Download Original</li>
+<li><strong>Outlook</strong> — File → Save As → <code>.eml</code></li>
+<li><strong>Apple Mail</strong> — File → Save As → Raw Message Source</li>
+</ul>
+
+<div class="cta">
+<strong>Score tells you the problem. The kit tells you the fix.</strong>
+<p style="margin:8px 0 0">The free script is the diagnostic core. The <a href="https://956231studio.com/packs/deliverability-rescue-kit/">Deliverability Rescue Kit</a> adds the authentication checklist, the warm-up and throttle schedule, and the remediation playbook to run after the score comes back. <a href="https://956231studio.com/packs/">All packs →</a></p>
+</div>
+
+<footer>
+Source: <a href="https://github.com/956231studiocom/email-deliverability-diagnose">github.com/956231studiocom/email-deliverability-diagnose</a> · MIT · Maintained by <a href="https://956231studio.com/">956231 Studio</a>
+</footer>
+</div>
+</body>
+</html>
